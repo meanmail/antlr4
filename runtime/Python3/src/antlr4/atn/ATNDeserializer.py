@@ -2,16 +2,17 @@
 # Use of this file is governed by the BSD 3-clause license that
 # can be found in the LICENSE.txt file in the project root.
 #/
-from uuid import UUID
-from io import StringIO
+import array
 from typing import Callable
+from uuid import UUID
+
 from antlr4.Token import Token
 from antlr4.atn.ATN import ATN
-from antlr4.atn.ATNType import ATNType
-from antlr4.atn.ATNState import *
-from antlr4.atn.Transition import *
-from antlr4.atn.LexerAction import *
 from antlr4.atn.ATNDeserializationOptions import ATNDeserializationOptions
+from antlr4.atn.ATNState import *
+from antlr4.atn.ATNType import ATNType
+from antlr4.atn.LexerAction import *
+from antlr4.atn.Transition import *
 
 # This is the earliest supported serialized UUID.
 BASE_SERIALIZED_UUID = UUID("AADB8D7E-AEEF-4415-AD2B-8204D6CF042E")
@@ -36,6 +37,7 @@ class ATNDeserializer (object):
         if options is None:
             options = ATNDeserializationOptions.defaultOptions
         self.deserializationOptions = options
+        self.data = None
 
     # Determines if a particular serialized representation of an ATN supports
     # a particular feature, identified by the {@link UUID} used for serializing
@@ -56,8 +58,9 @@ class ATNDeserializer (object):
         idx2 = SUPPORTED_UUIDS.index(actualUuid)
         return idx2 >= idx1
 
-    def deserialize(self, data : str):
-        self.reset(data)
+    def deserialize(self, data: array):
+        self.data = data
+        self.reset()
         self.checkVersion()
         self.checkUUID()
         atn = self.readATN()
@@ -83,19 +86,11 @@ class ATNDeserializer (object):
             self.verifyATN(atn)
         return atn
 
-    def reset(self, data:str):
-        def adjust(c):
-            v = ord(c)
-            return v-2 if v>1 else v + 65533
-        temp = [ adjust(c) for c in data ]
-        # don't adjust the first value since that's the version number
-        temp[0] = ord(data[0])
-        self.data = temp
+    def reset(self):
         self.pos = 0
 
     def checkVersion(self):
-        version = self.readInt()
-        if version != SERIALIZED_VERSION:
+        if self.data[0] != SERIALIZED_VERSION:
             raise Exception("Could not deserialize ATN with version " + str(version) + " (expected " + str(SERIALIZED_VERSION) + ").")
 
     def checkUUID(self):
